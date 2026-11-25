@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login · Shopping Mart</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a href="index.html" class="logo">Shopping Mart</a>
+</header>
+
+<div class="login-screen">
+  <form id="authForm" class="login-box">
+    <div class="auth-tabs">
+      <button type="button" id="tabLogin" class="on">Login</button>
+      <button type="button" id="tabSignup">Create account</button>
+    </div>
+
+    <h2 id="authTitle">Welcome back</h2>
+
+    <div id="signupFields" class="hidden">
+      <input name="name" placeholder="Full name">
+      <input name="phone" placeholder="Phone number">
+    </div>
+
+    <input name="email" type="email" placeholder="Email" required>
+    <input name="password" type="password" placeholder="Password (min 6 characters)" required>
+
+    <button id="authBtn" class="btn primary full" type="submit">Login</button>
+    <p id="authError" class="error"></p>
+    <p class="muted small">You need to log in before you can place an order.</p>
+    <p><a href="index.html">← Back to store</a></p>
+    <p><a href="admin.html" class="admin-link" style="color: black; font-weight: bold;" >Admin Login</a></p>
+
+  </form>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+
+  // Where to go after login (the page the customer came from)
+  let next = new URLSearchParams(location.search).get("next") || "account.html";
+  if (/^(https?:)?\/\//i.test(next) || next.includes(":")) next = "account.html"; // block outside links
+
+  let mode = "login";
+  function setMode(m) {
+    mode = m;
+    $("tabLogin").classList.toggle("on", m === "login");
+    $("tabSignup").classList.toggle("on", m === "signup");
+    $("signupFields").classList.toggle("hidden", m === "login");
+    $("authTitle").textContent = m === "login" ? "Welcome back" : "Create your account";
+    $("authBtn").textContent = m === "login" ? "Login" : "Create account";
+    document.querySelectorAll("#signupFields input").forEach(i => { i.required = m === "signup"; });
+    $("authError").textContent = "";
+  }
+  $("tabLogin").onclick = () => setMode("login");
+  $("tabSignup").onclick = () => setMode("signup");
+  setMode("login");
+
+  $("authForm").onsubmit = async e => {
+    e.preventDefault();
+    $("authError").textContent = "";
+    const f = Object.fromEntries(new FormData(e.target).entries());
+
+    try {
+      if (f.password.length < 6) throw new Error("Password must be at least 6 characters.");
+      if (mode === "signup") {
+        if (!f.name || !f.name.trim()) throw new Error("Please enter your name.");
+        if (!/^[0-9+\- ]{7,15}$/.test(f.phone || "")) throw new Error("Enter a valid phone number.");
+        await signUp(f);
+      } else {
+        await logIn(f.email, f.password);
+      }
+      location.href = next;
+    } catch (err) {
+      $("authError").textContent = err.message;
+    }
+  };
+</script>
+<script src="trendy.js"></script>
+</body>
+</html>

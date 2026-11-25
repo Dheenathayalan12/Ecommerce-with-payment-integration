@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Account · Shopping Mart</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a href="index.html" class="logo">Shopping Mart</a>
+  <div class="row" style="flex:none; gap:8px">
+    <a href="shop.html" class="auth-link">Shop</a>
+    <button id="logoutBtn" class="auth-link logout-btn" type="button">Logout</button>
+  </div>
+</header>
+
+<main class="acc-page">
+  <h1 id="hello">My Account</h1>
+
+  <section class="acc-card">
+    <h2>Delivery details</h2>
+    <form id="profileForm" class="form-grid">
+      <label>Full name<input name="name" required></label>
+      <label>Phone<input name="phone" required></label>
+      <label class="full">Default delivery address<textarea name="address" rows="2"></textarea></label>
+      <div class="full"><button class="btn primary" type="submit">Save details</button></div>
+    </form>
+  </section>
+
+  <section class="acc-card">
+    <h2>My orders</h2>
+    <div id="myOrders"></div>
+  </section>
+</main>
+
+<!-- ORDER DETAIL POPUP -->
+<div id="detailModal" class="modal hidden">
+  <div class="modal-box" id="detailBody"></div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="shared.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const user = getCurrentUser();
+
+  if (!user) {
+    location.href = "login.html?next=account.html";
+  } else {
+    startPage();
+  }
+
+  /* ---------- helpers (function declarations, so order does not matter) ---------- */
+  function fieldOf(name) {
+    return document.querySelector(`#profileForm [name="${name}"]`);
+  }
+
+  function fmtExpected(s) {
+    if (!s) return "Not set yet";
+    const [y, m, d] = s.split("-");
+    return new Date(y, m - 1, d).toDateString();
+  }
+
+  function fmtDate(s) {
+    return s ? new Date(s).toLocaleDateString() : "";
+  }
+
+  function trackBar(o) {
+    const cur = stepIndex(o.status);
+    return `<ol class="track">${ORDER_STEPS.map((s, i) => {
+      const h = (o.history || []).find(x => normStatus(x.status) === s);
+      return `<li class="${i <= cur ? "done" : ""} ${i === cur ? "now" : ""}">
+                ${s}<br><small>${fmtDate(h && h.at)}</small>
+              </li>`;
+    }).join("")}</ol>`;
+  }
+
+  function statusBadge(o) {
+    const st = normStatus(o.status);
+    const cls = st === "cancelled" ? "cancelled" : st === "delivered" ? "delivered" : "";
+    return `<span class="o-badge ${cls}">${esc(st)}</span>`;
+  }
+
+  function deliveryBlock(o) {
+    const dl = o.delivery || {};
+    return `
+      <div class="delivery-info">
+        <div><strong>Deliver to:</strong> ${esc(o.customer.name)}, ${esc(o.customer.address)}</div>
+        <div><strong>Expected by:</strong> ${fmtExpected(dl.expectedDate)}</div>
+        <div><strong>Delivery partner:</strong> ${esc(dl.partner || "Not assigned yet")}</div>
+        <div><strong>Tracking ID:</strong> ${esc(dl.trackingId || "Not available yet")}</div>
+      </div>`;
+  }
+
+  /* ---------- profile ---------- */
+  function fillProfile() {
+    fieldOf("name").value = user.name || "";
+    fieldOf("phone").value = user.phone || "";
+    fieldOf("address").value = user.address || "";
+  }
+
+  /* ---------- orders ---------- */
+  function renderOrders() {
+    const mine = getOrders().filter(o => o.userId === user.id).reverse();
+    $("myOrders").innerHTML = mine.length
+      ? mine.map(o => `
+        <div class="o-card">
+          <div class="o-head">
+            <div>
+              <strong>${esc(o.id)}</strong><br>
+              <small class="muted">Placed ${new Date(o.createdAt).toLocaleString()}</small>
+            </div>
+            ${statusBadge(o)}
+          </div>
+          ${normStatus(o.status) === "cancelled"
+            ? `<p class="cancelled-note">This order was cancelled.</p>`
+            : trackBar(o)}
+          ${deliveryBlock(o)}
+          <div class="o-actions">
+            <span>Total <strong>${money(o.totals.total)}</strong></span>
+            <button class="btn small primary" type="button" data-view="${esc(o.id)}">View details</button>
+          </div>
+        </div>`).join("")
+      : `<p class="muted">No orders yet. <a href="shop.html">Start shopping</a></p>`;
+  }
+
+  function openDetail(orderId) {
+    const o = getOrders().find(x => x.id === orderId);
+    if (!o) return toast("Order not found.");
+
+    $("detailBody").innerHTML = `
+      <div class="o-head">
+        <div>
+          <h2 style="margin:0">Order ${esc(o.id)}</h2>
+          <small class="muted">Placed ${new Date(o.createdAt).toLocaleString()}</small>
+        </div>
+        ${statusBadge(o)}
+      </div>
+
+      ${normStatus(o.status) === "cancelled"
+        ? `<p class="cancelled-note">This order was cancelled.</p>`
+        : trackBar(o)}
+
+      <h3>Delivery</h3>
+      ${deliveryBlock(o)}
+
+      <h3>Items</h3>
+      <table class="spec-table">
+        ${o.items.map(i => `
+          <tr>
+            <th>${esc(i.name)}<br><small class="muted">${esc(i.category || "")}</small></th>
+            <td>${i.qty} × ${money(i.unitPrice)} = <strong>${money(i.qty * i.unitPrice)}</strong></td>
+          </tr>`).join("")}
+      </table>
+
+      <h3>Bill</h3>
+      <table class="spec-table">
+        <tr><th>Subtotal</th><td>${money(o.totals.subtotal)}</td></tr>
+        <tr><th>Tax</th><td>${money(o.totals.tax)}</td></tr>
+        <tr><th>Delivery</th><td>${o.totals.delivery ? money(o.totals.delivery) : "FREE"}</td></tr>
+        <tr><th>Total</th><td><strong>${money(o.totals.total)}</strong></td></tr>
+      </table>
+
+      <h3>Payment</h3>
+      <p>Method: ${esc(o.payment.method)} · Status: ${esc(o.payment.status)}<br>
+         Reference: ${esc(o.payment.ref)}</p>
+
+      <div class="full row" style="margin-top:14px">
+        <button type="button" class="btn" id="closeDetail">Close</button>
+      </div>`;
+
+    $("detailModal").classList.remove("hidden");
+  }
+
+  function closeDetail() {
+    $("detailModal").classList.add("hidden");
+  }
+
+  /* ---------- page wiring (runs after everything above is defined) ---------- */
+  function startPage() {
+    $("hello").textContent = "Hi, " + user.name;
+    fillProfile();
+    renderOrders();
+
+    $("profileForm").onsubmit = e => {
+      e.preventDefault();
+      const patch = {
+        name: fieldOf("name").value.trim(),
+        phone: fieldOf("phone").value.trim(),
+        address: fieldOf("address").value.trim()
+      };
+      if (!patch.name || !patch.phone) return toast("Name and phone are required.");
+      updateUser(user.id, patch);
+      Object.assign(user, patch);
+      $("hello").textContent = "Hi, " + user.name;
+      toast("Details saved.");
+    };
+
+    $("logoutBtn").onclick = () => {
+      logOut();
+      location.href = "index.html";
+    };
+
+    $("myOrders").onclick = e => {
+      const id = e.target.dataset.view;
+      if (id) openDetail(id);
+    };
+
+    $("detailModal").onclick = e => {
+      if (e.target.id === "detailModal" || e.target.id === "closeDetail") closeDetail();
+    };
+
+    // Refresh automatically when the admin updates an order in another tab
+    window.addEventListener("storage", e => {
+      if (e.key === KEYS.orders) renderOrders();
+    });
+  }
+</script>
+<script src="boost.js"></script>
+<script src="trendy.js"></script>
+<script src="alerts.js"></script>
+<script src="extras.js"></script>
+</body>
+</html>

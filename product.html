@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product · Shopping Mart</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="product">
+
+<header class="topbar">
+  <a href="index.html" class="logo" id="logo">Shopping Mart</a>
+  <form id="searchForm"><input id="search" type="search" placeholder="Search products..."></form>
+  <button id="cartBtn" class="cart-btn">🛒 <span id="cartCount">0</span></button>
+</header>
+
+<nav class="catnav" id="catNav"></nav>
+
+<main class="pd-main">
+  <div id="crumbs" class="crumbs"></div>
+
+  <div id="productView" class="pd-wrap">
+    <p class="empty">Loading product...</p>
+  </div>
+
+  <section class="section" style="padding:24px 0 0">
+    <h2>Related products</h2>
+    <div id="related" class="menu-grid"></div>
+  </section>
+</main>
+
+<script src="shared.js"></script>
+<script src="app.js"></script>
+<script src="boost.js"></script>
+<script src="trendy.js"></script>
+<script src="alerts.js"></script>
+<script src="extras.js"></script>
+</body>
+</html>
